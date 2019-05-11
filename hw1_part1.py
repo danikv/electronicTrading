@@ -6,9 +6,6 @@ import numpy as np
 import pandas as pd
 import networkx as nx
 import random
-import concurrent.futures
-
-
 
 import Timer
 random.seed(0)
@@ -53,7 +50,6 @@ def calc_error(predictions, test, mode='undirected unweighted'):
 	precision, recall=0,0
 	data_list = tuple(map(tuple, test.values.tolist()))
 	intersections = set(predictions) & set(data_list)
-	print(len(predictions))
 	recall = len(intersections) / len(test)
 	precision = len(intersections) / len(predictions)
 	return (precision, recall)
@@ -105,21 +101,28 @@ def should_add_edge(probability) :
 
 def calculate_probabilities(graph, mode='undirected unweighted') :
 	probabilities_to_add_edge = defaultdict(dict)
+	if mode == 'directed':
+		shortest_path_lengths = dict(nx.all_pairs_shortest_path_length(graph))
 	for node in graph.nodes() :
-		for second_node in graph.nodes():
-			if node != second_node and second_node not in graph.neighbors(node):
-				if mode == 'undirected unweighted' :
-					coomon_neighbors_size = len(list(nx.common_neighbors(graph, node, second_node)))
-					probabilities_to_add_edge[node][second_node] = 1 - pow(float(0.97), coomon_neighbors_size)
-				elif mode == 'undirected weighted' :
-					m = 0
-					n = 0
-					for neighbor in nx.common_neighbors(graph, node, second_node) :
-						if graph[node][neighbor]['weight'] == 'strong' :
-							m += 1
-						else:
-							n += 1
-					probabilities_to_add_edge[node][second_node] = 1 - ((1 - pow(float(0.96), m)) * (1 - pow(float(0.98),n)))
+		for second_node in nx.non_neighbors(graph, node):
+			if mode == 'undirected unweighted' :
+				coomon_neighbors_size = len(list(nx.common_neighbors(graph, node, second_node)))
+				probabilities_to_add_edge[node][second_node] = 1 - pow(float(0.97), coomon_neighbors_size)
+			elif mode == 'undirected weighted' :
+				m = 0
+				n = 0
+				for neighbor in nx.common_neighbors(graph, node, second_node) :
+					if graph[node][neighbor]['weight'] == 'strong' :
+						m += 1
+					else:
+						n += 1
+				probabilities_to_add_edge[node][second_node] = 1 - ((1 - pow(float(0.96), m)) * (1 - pow(float(0.98),n)))
+			elif mode == 'directed':
+				if second_node in shortest_path_lengths[node]:
+					L = shortest_path_lengths[node][second_node]
+					if L <= 4:
+						M = len(list(nx.all_shortest_paths(graph, node, second_node)))
+						probabilities_to_add_edge[node][second_node] = min(1, M / (math.pow(5, L)))
 	return probabilities_to_add_edge
 
 def run_k_iterations(graph, N, mode='undirected unweighted'):
@@ -130,10 +133,10 @@ def run_k_iterations(graph, N, mode='undirected unweighted'):
 			for second_node, probability in value.items():
 				if should_add_edge(probability) :
 					added_edges.append((node, second_node))
-					if mode == 'undirected unweighted' :
-						graph.add_edge(node, second_node)
-					elif mode == 'undirected weighted' :
+					if mode == 'undirected weighted' :
 						graph.add_edge(node, second_node, weight='weak')
+					else:
+						graph.add_edge(node, second_node)
 		N -= 1
 	return added_edges
 	
@@ -149,8 +152,6 @@ def partA_q1(dataset):
 	x = np.log(np.array(df_hist['count']))
 	y = np.log(np.array(df_hist['hist_value']))
 	a = np.polyfit(x, y, 1)
-	print('c value is - ', -a[0])
-	print('a value is - ', np.exp(a[1]))
 	y_1 = [(a[0]*i + a[1]) for i in x]
 	fig = plt.figure()
 	ax = fig.gca()
