@@ -37,19 +37,17 @@ def main():
 	data_reading.stop()
 
 	####################### unweighted undirected graph #######################
-		
-	
 
-	#model0_timer = Timer.Timer('unweighted undirected graph')
+	model0_timer = Timer.Timer('unweighted undirected graph')
 
-	#unweighted_H_t=st.create_unweighted_H_t(data.train, time)
-	#test_predictions_list = st.run_k_iterations(unweighted_H_t, k, mode='undirected unweighted')
-	#eval_timer = Timer.Timer('Error calculation')
-	#eval_res=st.calc_error(test_predictions_list, data.test_x,  mode='undirected unweighted')
-	#print(f'unweighted undirected graph Precision {eval_res[0]}, Recall {eval_res[1]}\n')
-	#eval_timer.stop()
+	unweighted_H_t=st.create_unweighted_H_t(data.train, time)
+	test_predictions_list = st.run_k_iterations(unweighted_H_t, k, mode='undirected unweighted')
+	eval_timer = Timer.Timer('Error calculation')
+	eval_res=st.calc_error(test_predictions_list, data.test_x,  mode='undirected unweighted')
+	print(f'unweighted undirected graph Precision {eval_res[0]}, Recall {eval_res[1]}\n')
+	eval_timer.stop()
 
-	#model0_timer.stop()
+	model0_timer.stop()
 
 	####################### weighted undirected graph #######################
 	model1_timer = Timer.Timer('weighted undirected graph')

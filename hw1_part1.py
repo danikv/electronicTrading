@@ -47,79 +47,61 @@ def create_weighted_H_t(train, time):
 	return h_t
 
 def create_unweighted_G_t(train, time):
-	return((1,2),(1,3), (3,1), (1,4))
-		
+	return nx.DiGraph(train)
 		
 def calc_error(predictions, test, mode='undirected unweighted'):
 	precision, recall=0,0
-	#get list intersection
-	if mode == 'undirected unweighted':
-		graph = nx.Graph(test)
-	elif mode == 'undirected weighted':
-		graph = create_weighted_H_t(test, 0)
-	intersections = 0
-	for edge in predictions :
-		if graph.has_edge(edge[0], edge[1]) :
-			#if mode == 'undirected unweighted':
-			intersections += 1
-			#if mode == 'undirected weighted':
-			#if graph[edge[0]][edge[1]]['weight'] == edge[3]:
-			#intersections += 1
-	recall = intersections / len(test)
-	precision = intersections / len(predictions)
+	data_list = tuple(map(tuple, test.values.tolist()))
+	intersections = set(predictions) & set(data_list)
+	print(len(predictions))
+	recall = len(intersections) / len(test)
+	precision = len(intersections) / len(predictions)
 	return (precision, recall)
 
-def update_node_betweenness(node, shortest_paths, b_dict, size):
-	shortest_path_with_node = 0
-	shortest_path_without_node = 0
-	for path_from, paths in shortest_paths.items() :
-		if path_from != node :
-			shortest_path_to_node = paths[node]
-			for path_to, path in paths.items() :
-				if path_to != node :
-					if shortest_path_to_node + shortest_paths[node][path_to] == path:
-						shortest_path_without_node += 1
-						shortest_path_with_node += 1
+def update_node_betweenness(node, graph, shortest_paths_length , size):
+	betweenes = 0
+	for x in graph.nodes() :
+		if node != x :
+			for y in graph.nodes() :
+				if x != y and node != y:
+					shortest_paths_with_node = 0
+					shortest_paths = 0
+					shortest_path_length_without_node = shortest_paths_length[x][y]
+					shortest_path_length_with_node = shortest_paths_length[x][node] + shortest_paths_length[node][y]
+					all_shortest_paths = list(nx.all_shortest_paths(graph, x, y))
+					if shortest_path_length_with_node == shortest_path_length_without_node :
+						for path in all_shortest_paths :
+							if node in path :
+								shortest_paths += 1
+								shortest_paths_with_node += 1
+							else:
+								shortest_paths += 1
 					else:
-						shortest_path_without_node += 1
-	b_dict[node] = (1 / ((size - 1) *(size -2 ))) * \
-		(shortest_path_with_node / shortest_path_without_node)
+						shortest_paths += len(list(all_shortest_paths))
+					betweenes += (shortest_paths_with_node / shortest_paths)
+	return (1 / ((size - 1) *(size -2 ))) * betweenes
 
 
 def G_features(G, time):
 	# section a is closeness centrality and b is betweenes centrality
-	g_t  = nx.DiGraph(G.train_x)
+	g_t  = create_unweighted_G_t(G.train, 0)
 	biggest_scc = nx.DiGraph(max(nx.strongly_connected_component_subgraphs(g_t), key=len))
 	a_dict = {}
 	b_dict = {}
 	size = biggest_scc.number_of_nodes()
+	shortest_paths = {}
 	reversed_scc = biggest_scc.reverse()
-	shortest_paths_length = {}
 	for node in  reversed_scc.nodes():
-		shortest_paths_length[node] = nx.single_source_shortest_path_length(biggest_scc,node)
-		a_dict[node] = (size - 1) / sum(shortest_paths_length[node])
+		shortest_paths[node] = nx.single_source_shortest_path_length(biggest_scc, node)
+		a_dict[node] = (size - 1) / sum(nx.single_source_shortest_path_length(reversed_scc,node).values())
 
-	for node in biggest_scc :
-		update_node_betweenness(node, shortest_paths_length, b_dict, size)
+	for node in biggest_scc.nodes() :
+		b_dict[node] = update_node_betweenness(node, biggest_scc, shortest_paths, size)
+	
+	return {'a': a_dict, 'b': b_dict }
 
-	print('finished')
-	#a2_dict = nx.closeness_centrality(biggest_scc, wf_improved=False)
-	b2_dict = nx.betweenness_centrality(biggest_scc)
-	#if a2_dict == a_dict :
-	#	print("equal")
-	for key, value in b_dict.items() :
-		if b2_dict[key] != value :
-			print("key : " + str(key) + " , value b1 : " + str(value) + ", value b2 : " + str(b2_dict[key]))
-	return {'a': a_dict, 'b': b2_dict }
-
-def should_add_edge(probability, mode='undirected unweighted') :
-	if mode == 'undirected unweighted':
-		return probability > random.random()
-	elif mode == 'undirected weighted':
-		for prob in probability:
-			if prob > random.random() :
-				return True
-		return False
+def should_add_edge(probability) :
+	return probability > random.random()
 
 def calculate_probabilities(graph, mode='undirected unweighted') :
 	probabilities_to_add_edge = defaultdict(dict)
@@ -128,16 +110,16 @@ def calculate_probabilities(graph, mode='undirected unweighted') :
 			if node != second_node and second_node not in graph.neighbors(node):
 				if mode == 'undirected unweighted' :
 					coomon_neighbors_size = len(list(nx.common_neighbors(graph, node, second_node)))
-					probability = 1 - pow(float(0.97), coomon_neighbors_size)
-					probabilities_to_add_edge[node][second_node] = probability
+					probabilities_to_add_edge[node][second_node] = 1 - pow(float(0.97), coomon_neighbors_size)
 				elif mode == 'undirected weighted' :
-					probability = []
+					m = 0
+					n = 0
 					for neighbor in nx.common_neighbors(graph, node, second_node) :
 						if graph[node][neighbor]['weight'] == 'strong' :
-							probability.append(0.04)
+							m += 1
 						else:
-							probability.append(0.02)
-					probabilities_to_add_edge[node][second_node] = probability
+							n += 1
+					probabilities_to_add_edge[node][second_node] = 1 - ((1 - pow(float(0.96), m)) * (1 - pow(float(0.98),n)))
 	return probabilities_to_add_edge
 
 def run_k_iterations(graph, N, mode='undirected unweighted'):
@@ -146,17 +128,11 @@ def run_k_iterations(graph, N, mode='undirected unweighted'):
 		probabilities_to_add_edge = calculate_probabilities(graph, mode)
 		for node , value in probabilities_to_add_edge.items() :
 			for second_node, probability in value.items():
-				if should_add_edge(probability, mode) :
+				if should_add_edge(probability) :
+					added_edges.append((node, second_node))
 					if mode == 'undirected unweighted' :
-						added_edges.append([node, second_node])
 						graph.add_edge(node, second_node)
 					elif mode == 'undirected weighted' :
-						#if graph.has_edge(node, second_node) :
-						#	added_edges.remove([second_node, node, 'weak'])
-						#	added_edges.append([node, second_node, 'strong'])
-						#	graph.add_edge(node, second_node, weight='strong')
-						#else:
-						added_edges.append([node, second_node, 'weak'])
 						graph.add_edge(node, second_node, weight='weak')
 		N -= 1
 	return added_edges
