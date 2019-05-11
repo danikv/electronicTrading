@@ -116,7 +116,7 @@ def calculate_probabilities(graph, mode='undirected unweighted') :
 						m += 1
 					else:
 						n += 1
-				probabilities_to_add_edge[node][second_node] = 1 - ((1 - pow(float(0.96), m)) * (1 - pow(float(0.98),n)))
+				probabilities_to_add_edge[node][second_node] = 1 - (pow(float(0.96), m) * pow(float(0.98),n))
 			elif mode == 'directed':
 				if second_node in shortest_path_lengths[node]:
 					L = shortest_path_lengths[node][second_node]
