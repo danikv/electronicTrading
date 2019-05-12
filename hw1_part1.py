@@ -34,15 +34,15 @@ def create_unweighted_H_t(train, time):
 
 
 def create_weighted_H_t(train, time):
-    h_t = nx.Graph()
-    direct_graph = nx.DiGraph(train)
-    for edge in direct_graph.edges():
-        # add weight to h_t
-        if h_t.has_edge(edge[0], edge[1]):
-            h_t.add_edge(edge[0], edge[1], weight='strong')
+    H_t = nx.Graph()
+    directed_graph = nx.DiGraph(train)
+    for edge in directed_graph.edges():
+        # add edges with weights to H_t
+        if H_t.has_edge(edge[0], edge[1]):
+            H_t.add_edge(edge[0], edge[1], weight='strong')
         else:
-            h_t.add_edge(edge[0], edge[1], weight='weak')
-    return h_t
+            H_t.add_edge(edge[0], edge[1], weight='weak')
+    return H_t
 
 
 def create_unweighted_G_t(train, time):
@@ -83,26 +83,21 @@ def update_node_betweenness(node, graph, shortest_paths_length, size):
 
 
 def G_features(G, time):
-    # section a is closeness centrality and b is betweenness centrality
-    g_t = create_unweighted_G_t(G.train, 0)
-    biggest_scc = nx.DiGraph(max(nx.strongly_connected_component_subgraphs(g_t), key=len))
-    a_dict = {}
-    b_dict = {}
+    G_t = create_unweighted_G_t(G.train, 0)
+    biggest_scc = nx.DiGraph(max(nx.strongly_connected_component_subgraphs(G_t), key=len))
+    closeness_dict = {}
+    betweenness_dict = {}
     size = biggest_scc.number_of_nodes()
     shortest_paths = {}
     reversed_scc = biggest_scc.reverse()
     for node in reversed_scc.nodes():
         shortest_paths[node] = nx.single_source_shortest_path_length(biggest_scc, node)
-        a_dict[node] = (size - 1) / sum(nx.single_source_shortest_path_length(reversed_scc, node).values())
+        closeness_dict[node] = (size - 1) / sum(nx.single_source_shortest_path_length(reversed_scc, node).values())
 
     for node in biggest_scc.nodes():
-        b_dict[node] = update_node_betweenness(node, biggest_scc, shortest_paths, size)
+        betweenness_dict[node] = update_node_betweenness(node, biggest_scc, shortest_paths, size)
 
-    return {'a': a_dict, 'b': b_dict}
-
-
-def should_add_edge(probability):
-    return probability > random.random()
+    return {'a': closeness_dict, 'b': betweenness_dict}
 
 
 def calculate_probabilities(graph, mode='undirected unweighted'):
@@ -125,31 +120,29 @@ def calculate_probabilities(graph, mode='undirected unweighted'):
                 probabilities_to_add_edge[node][second_node] = 1 - (pow(float(0.96), m) * pow(float(0.98), n))
             elif mode == 'directed':
                 if second_node in shortest_path_lengths[node]:
-                    L = shortest_path_lengths[node][second_node]
-                    if L <= 4:
-                        M = len(list(nx.all_shortest_paths(graph, node, second_node)))
-                        probabilities_to_add_edge[node][second_node] = min(1, M / (math.pow(5, L)))
+                    shortest_path_distance = shortest_path_lengths[node][second_node]
+                    if shortest_path_distance <= 4:
+                        all_paths_count = len(list(nx.all_shortest_paths(graph, node, second_node)))
+                        probabilities_to_add_edge[node][second_node] = min(1, all_paths_count / (math.pow(5, shortest_path_distance)))
     return probabilities_to_add_edge
 
 
 def run_k_iterations(graph, N, mode='undirected unweighted'):
-    added_edges = []
-    while(N > 0):
+    edges_to_add = []
+    for i in range(N):
         probabilities_to_add_edge = calculate_probabilities(graph, mode)
         for node, value in probabilities_to_add_edge.items():
             for second_node, probability in value.items():
-                if should_add_edge(probability):
-                    added_edges.append((node, second_node))
+                if probability > random.random():
+                    edges_to_add.append((node, second_node))
                     if mode == 'undirected weighted':
                         graph.add_edge(node, second_node, weight='weak')
                     else:
                         graph.add_edge(node, second_node)
-        N -= 1
-    return added_edges
+    return edges_to_add
 
 
-def partA_q1(dataset):
-    # plot
+def compute_distribution(dataset):
     data = pd.read_csv(dataset)
     df = data[['source', 'target']].groupby('source')['target'].nunique().reset_index(name='count')
     df_hist = df.groupby('count')['source'].count().reset_index(name='hist_value')
