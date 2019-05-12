@@ -10,7 +10,6 @@ def main():
 	###########################################################################
 	time=1345521600
 	
-	#st.partA_q1('data_students.txt')
 	
 	"""Read the data files with the class ModelData into the a data object"""
 	total_time = Timer.Timer('Total running time')
@@ -18,11 +17,7 @@ def main():
 	data = st.ModelData('data_students.txt', time)
 	data_reading.stop()
 
-	data_reading = Timer.Timer('Calculate Features')
-	#features_dict=st.G_features(data, time)
-	data_reading.stop()
-
-	#print (features_dict)
+	features_dict=st.G_features(data, time)
 
 	###########################################################################
 	#######################            Part B           #######################
@@ -37,12 +32,15 @@ def main():
 	data_reading.stop()
 
 	####################### unweighted undirected graph #######################
+		
+	
 
 	model0_timer = Timer.Timer('unweighted undirected graph')
 
 	unweighted_H_t=st.create_unweighted_H_t(data.train, time)
 	test_predictions_list = st.run_k_iterations(unweighted_H_t, k, mode='undirected unweighted')
 	eval_timer = Timer.Timer('Error calculation')
+	
 	eval_res=st.calc_error(test_predictions_list, data.test_x,  mode='undirected unweighted')
 	print(f'unweighted undirected graph Precision {eval_res[0]}, Recall {eval_res[1]}\n')
 	eval_timer.stop()
