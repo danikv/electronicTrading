@@ -8,7 +8,10 @@ def main():
 	###########################################################################
 	#######################            Part A           #######################
 	###########################################################################
-	time=1345521600
+	time=1365825600
+
+	data = st.ModelData('data_students.txt', time)
+	st.last_question(data)
 	
 	#st.partA_q1('data_students.txt')
 	
@@ -19,7 +22,7 @@ def main():
 	data_reading.stop()
 
 	data_reading = Timer.Timer('Calculate Features')
-	#features_dict=st.G_features(data, time)
+	features_dict=st.G_features(data, time)
 	data_reading.stop()
 
 	#print (features_dict)
