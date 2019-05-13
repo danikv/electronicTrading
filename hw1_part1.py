@@ -74,7 +74,7 @@ def G_features(G, time):
 
     for node in biggest_scc.nodes():
         S, P, sigma = find_shortest_paths(biggest_scc, node)
-        betweenness_dict = compute_betweenness(betweenness_dict, S, P, sigma, node)
+        betweenness_dict = calculate_betweenness(betweenness_dict, S, P, sigma, node)
 
     scale = 1.0 / ((size - 1) * (size - 2))
     for node in betweenness_dict:
@@ -83,7 +83,7 @@ def G_features(G, time):
     return {'a': closeness_dict, 'b': betweenness_dict}
 
 
-def compute_betweenness(betweenness_dict, S, P, sigma, source):
+def calculate_betweenness(betweenness_dict, S, P, sigma, source):
     delta = dict.fromkeys(S, 0)
     while S:
         node = S.pop()
@@ -139,7 +139,7 @@ def run_k_iterations(graph, N, mode='undirected unweighted'):
     return edges_to_add
 
 
-def compute_distribution(dataset):
+def calculate_distribution(dataset):
     data = pd.read_csv("data_students.txt")
     dataframe = data[['source', 'target']].groupby('source').nunique()
     dataframe['target'].plot.hist(ylim=(0, 50))
@@ -188,13 +188,13 @@ def find_shortest_paths(graph, source):
     while Q: # we use BFS to find the shortest paths
         node = Q.pop(0)
         S.append(node)
-        Dv = distances[node]
+        node_distance = distances[node]
         sigma_node = sigma[node]
         for second_node in graph[node]:
             if second_node not in distances:
                 Q.append(second_node)
-                distances[second_node] = Dv + 1
-            if distances[second_node] == Dv + 1:  # if we found the shortest path, we count it
+                distances[second_node] = node_distance + 1
+            if distances[second_node] == node_distance + 1:  # if we found the shortest path, we count it
                 sigma[second_node] += sigma_node
                 P[second_node].append(node)  # we save the predecessors
     return S, P, sigma
