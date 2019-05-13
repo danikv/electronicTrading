@@ -28,27 +28,26 @@ class ModelData:
         self.test_x = self.test[['source', 'target']]
         self.test_y = self.test[['rating']]
 
-
+# for Part B
 def create_unweighted_H_t(train, time):
     return nx.Graph(train)
 
-
+# for Part B
 def create_weighted_H_t(train, time):
     H_t = nx.Graph()
     directed_graph = nx.DiGraph(train)
     for edge in directed_graph.edges():
-        # add edges with weights to H_t
         if H_t.has_edge(edge[0], edge[1]):
             H_t.add_edge(edge[0], edge[1], weight='strong')
         else:
             H_t.add_edge(edge[0], edge[1], weight='weak')
     return H_t
 
-
+# for Part A2
 def create_unweighted_G_t(train, time):
     return nx.DiGraph(train)
 
-
+# for part B
 def calc_error(predictions, test, mode='undirected unweighted'):
     precision, recall = 0, 0
     data_list = tuple(map(tuple, test.values.tolist()))
@@ -57,7 +56,7 @@ def calc_error(predictions, test, mode='undirected unweighted'):
     precision = len(intersections) / len(predictions)
     return (precision, recall)
 
-
+# Part A2
 def G_features(G, time):
     G_t = create_unweighted_G_t(G.train, 0)
     biggest_scc = nx.DiGraph(max(nx.strongly_connected_component_subgraphs(G_t), key=len))
@@ -73,8 +72,8 @@ def G_features(G, time):
         closeness_dict[node] = (size - 1) / sum(nx.single_source_shortest_path_length(reversed_scc, node).values())
 
     for node in biggest_scc.nodes():
-        S, P, sigma = find_shortest_paths(biggest_scc, node)
-        betweenness_dict = calculate_betweenness(betweenness_dict, S, P, sigma, node)
+        S, P, shortest_paths = find_shortest_paths(biggest_scc, node)
+        betweenness_dict = calculate_betweenness(betweenness_dict, S, P, shortest_paths, node)
 
     scale = 1.0 / ((size - 1) * (size - 2))
     for node in betweenness_dict:
@@ -82,7 +81,7 @@ def G_features(G, time):
 
     return {'a': closeness_dict, 'b': betweenness_dict}
 
-
+# for Part A2
 def calculate_betweenness(betweenness_dict, S, P, sigma, source):
     delta = dict.fromkeys(S, 0)
     while S:
@@ -94,14 +93,14 @@ def calculate_betweenness(betweenness_dict, S, P, sigma, source):
             betweenness_dict[node] += delta[node]
     return betweenness_dict
 
-
+# for Part B
 def calculate_probabilities(graph, mode='undirected unweighted'):
     probabilities_to_add_edge = defaultdict(dict)
     if mode == 'directed':
         shortest_path_lengths = dict(nx.all_pairs_shortest_path_length(graph))
     for node in graph.nodes():
         if mode == 'directed':
-            shortest_paths = find_shortest_paths(graph, node)[2]
+            S, P, shortest_paths = find_shortest_paths(graph, node)
         for second_node in nx.non_neighbors(graph, node):
             if mode == 'undirected unweighted':
                 common_neighbors_size = len(list(nx.common_neighbors(graph, node, second_node)))
@@ -123,7 +122,7 @@ def calculate_probabilities(graph, mode='undirected unweighted'):
                         probabilities_to_add_edge[node][second_node] = min(1, all_paths_count / (math.pow(5, shortest_path_distance)))
     return probabilities_to_add_edge
 
-
+# Part B
 def run_k_iterations(graph, N, mode='undirected unweighted'):
     edges_to_add = []
     for i in range(N):
@@ -138,7 +137,7 @@ def run_k_iterations(graph, N, mode='undirected unweighted'):
                         graph.add_edge(node, second_node)
     return edges_to_add
 
-
+# Part A1
 def calculate_distribution(dataset):
     data = pd.read_csv("data_students.txt")
     dataframe = data[['source', 'target']].groupby('source').nunique()
@@ -162,7 +161,7 @@ def calculate_distribution(dataset):
     ax.set_xscale('log')
     plt.show()
 
-    # bow tie
+    # bow tie structure calculation
     source_data = data['source'].tolist()
     target_data = data['target'].tolist()
     intersection = list(set(source_data) & set(target_data))
@@ -173,7 +172,8 @@ def calculate_distribution(dataset):
     print(len(intersection))
     print(len(right_data))
     print(len(left_data.union(intersection, right_data)))
-
+    print('a =', np.exp(a[1]))
+    print('c =', -a[0])
 
 def find_shortest_paths(graph, source):
     S = []
