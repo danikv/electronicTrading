@@ -55,28 +55,40 @@ def calc_error(predictions, test, mode='undirected unweighted'):
 	precision = len(intersections) / len(predictions)
 	return (precision, recall)
 
-def update_node_betweenness(node, graph, shortest_paths_length , size):
-	betweenes = 0
-	for x in graph.nodes() :
-		if node != x :
-			for y in graph.nodes() :
-				if x != y and node != y:
-					shortest_paths_with_node = 0
-					shortest_paths = 0
-					shortest_path_length_without_node = shortest_paths_length[x][y]
-					shortest_path_length_with_node = shortest_paths_length[x][node] + shortest_paths_length[node][y]
-					all_shortest_paths = list(nx.all_shortest_paths(graph, x, y))
-					if shortest_path_length_with_node == shortest_path_length_without_node :
-						for path in all_shortest_paths :
-							if node in path :
-								shortest_paths += 1
-								shortest_paths_with_node += 1
-							else:
-								shortest_paths += 1
-					else:
-						shortest_paths += len(list(all_shortest_paths))
-					betweenes += (shortest_paths_with_node / shortest_paths)
-	return (1 / ((size - 1) *(size -2 ))) * betweenes
+def BFS_With_Number_Of_Shortest_Paths(G, source):
+    S = []
+    P = {}
+    for v in G:
+        P[v] = []
+    sigma = dict.fromkeys(G, 0.0)    # sigma[v]=0 for v in G
+    D = {}
+    sigma[source] = 1.0
+    D[source] = 0
+    Q = [source]
+    while Q:   # use BFS to find shortest paths
+        v = Q.pop(0)
+        S.append(v)
+        Dv = D[v]
+        sigmav = sigma[v]
+        for w in G[v]:
+            if w not in D:
+                Q.append(w)
+                D[w] = Dv + 1
+            if D[w] == Dv + 1:   # this is a shortest path, count paths
+                sigma[w] += sigmav
+                P[w].append(v)  # predecessors
+    return S, P, sigma
+
+def update_betweenness(betweenness, bfs_nodes_queue, predecessors, number_of_shortest_paths, source):
+    delta = dict.fromkeys(bfs_nodes_queue, 0)
+    while bfs_nodes_queue:
+        w = bfs_nodes_queue.pop()
+        coeff = (1 + delta[w]) / number_of_shortest_paths[w]
+        for v in predecessors[w]:
+            delta[v] += number_of_shortest_paths[v] * coeff
+        if w != source:
+            betweenness[w] += delta[w]
+    return betweenness
 
 
 def G_features(G, time):
@@ -84,17 +96,19 @@ def G_features(G, time):
 	g_t  = create_unweighted_G_t(G.train, 0)
 	biggest_scc = nx.DiGraph(max(nx.strongly_connected_component_subgraphs(g_t), key=len))
 	a_dict = {}
-	b_dict = {}
+	b_dict = dict.fromkeys(biggest_scc, 0.0)
 	size = biggest_scc.number_of_nodes()
-	shortest_paths = {}
 	reversed_scc = biggest_scc.reverse()
 	for node in  reversed_scc.nodes():
-		shortest_paths[node] = nx.single_source_shortest_path_length(biggest_scc, node)
 		a_dict[node] = (size - 1) / sum(nx.single_source_shortest_path_length(reversed_scc,node).values())
 
 	for node in biggest_scc.nodes() :
-		b_dict[node] = update_node_betweenness(node, biggest_scc, shortest_paths, size)
+		nodes_queue, predecessors, number_of_shortest_paths = BFS_With_Number_Of_Shortest_Paths(biggest_scc, node)
+		b_dict = update_betweenness(b_dict, nodes_queue, predecessors, number_of_shortest_paths, node)
 	
+	for node in biggest_scc.nodes() :
+		b_dict[node] = b_dict[node] * (1 / ((size - 1) * (size -2)))
+
 	return {'a': a_dict, 'b': b_dict }
 
 def should_add_edge(probability) :
@@ -102,8 +116,11 @@ def should_add_edge(probability) :
 
 def calculate_probabilities(graph, mode='undirected unweighted') :
 	probabilities_to_add_edge = defaultdict(dict)
+	number_of_shortest_paths = {}
 	if mode == 'directed':
 		shortest_path_lengths = dict(nx.all_pairs_shortest_path_length(graph))
+		for node in graph.nodes() :
+			number_of_shortest_paths[node] = BFS_With_Number_Of_Shortest_Paths(graph, node)[2]
 	for node in graph.nodes() :
 		for second_node in nx.non_neighbors(graph, node):
 			if mode == 'undirected unweighted' :
@@ -122,7 +139,7 @@ def calculate_probabilities(graph, mode='undirected unweighted') :
 				if second_node in shortest_path_lengths[node]:
 					L = shortest_path_lengths[node][second_node]
 					if L <= 4:
-						M = len(list(nx.all_shortest_paths(graph, node, second_node)))
+						M = number_of_shortest_paths[node][second_node]
 						probabilities_to_add_edge[node][second_node] = min(1, M / (math.pow(5, L)))
 	return probabilities_to_add_edge
 
@@ -143,8 +160,8 @@ def run_k_iterations(graph, N, mode='undirected unweighted'):
 
 def last_question(dataset):
 	#first try linear regression
-	points = dataset.train[['source', 'target', 'rating']].values
-	centroids = initialize_centroids(points, 10)
+	points = dataset.train[['source', 'rating']].values
+	centroids = initialize_centroids(points, 20)
 
 	closest = closest_centroid(points, centroids)
 	centroids = move_centroids(points, closest, centroids)
@@ -154,13 +171,33 @@ def last_question(dataset):
 		old_centroids = centroids
 		centroids = move_centroids(points, closest, centroids)
 
-	points = dataset.test[['source', 'target', 'rating']].values
+	points = dataset.train[['target', 'rating']].values
+	centroids = initialize_centroids(points, 10)
+
+	closest = closest_centroid(points, centroids)
+	centroids2 = move_centroids(points, closest, centroids)
+	old_centroids = []
+	while np.array_equal(centroids, old_centroids):
+		closest = closest_centroid(points, centroids)
+		old_centroids = centroids
+		centroids = move_centroids(points, closest, centroids)
+
+	points = dataset.test[['source', 'rating']].values
 	for point in points :
 		print(point)
 		print(closest_centroid(point, centroids))
 	plt.subplot(122)
-	plt.scatter(points[:, 0], points[:, 2])
-	plt.scatter(centroids[:, 0], centroids[:, 2], c='r', s=100)
+	plt.scatter(points[:, 0], points[:, 1])
+	plt.scatter(centroids[:, 0], centroids[:, 1], c='r', s=100)
+	plt.show()
+
+	points = dataset.test[['target', 'rating']].values
+	for point in points :
+		print(point)
+		print(closest_centroid(point, centroids2))
+	plt.subplot(122)
+	plt.scatter(points[:, 0], points[:, 1])
+	plt.scatter(centroids2[:, 0], centroids2[:, 1], c='r', s=100)
 	plt.show()
 
 def move_centroids(points, closest, centroids):

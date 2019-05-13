@@ -8,10 +8,10 @@ def main():
 	###########################################################################
 	#######################            Part A           #######################
 	###########################################################################
-	time=1365825600
+	time=1345521600
 
-	data = st.ModelData('data_students.txt', time)
-	st.last_question(data)
+	#data = st.ModelData('data_students.txt', time)
+	#st.last_question(data)
 	
 	#st.partA_q1('data_students.txt')
 	
@@ -41,7 +41,7 @@ def main():
 
 	####################### unweighted undirected graph #######################
 
-	model0_timer = Timer.Timer('unweighted undirected graph')
+	""" model0_timer = Timer.Timer('unweighted undirected graph')
 
 	unweighted_H_t=st.create_unweighted_H_t(data.train, time)
 	test_predictions_list = st.run_k_iterations(unweighted_H_t, k, mode='undirected unweighted')
@@ -64,7 +64,7 @@ def main():
 	print(f'weighted undirected graph Precision {eval_res[0]}, Recall {eval_res[1]}\n')
 	eval_timer.stop()
 
-	model1_timer.stop()
+	model1_timer.stop() """
 
 	####################### unweighted directed graph #######################
 	model2_timer = Timer.Timer('unweighted directed graph')
