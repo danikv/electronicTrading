@@ -58,46 +58,41 @@ def calc_error(predictions, test, mode='undirected unweighted'):
     return (precision, recall)
 
 
-def update_node_betweenness(node, graph, shortest_paths_length, size):
-    betweenness = 0
-    for x in graph.nodes():
-        if node != x:
-            for y in graph.nodes():
-                if x != y and node != y:
-                    shortest_paths_with_node = 0
-                    shortest_paths = 0
-                    shortest_path_length_without_node = shortest_paths_length[x][y]
-                    shortest_path_length_with_node = shortest_paths_length[x][node] + shortest_paths_length[node][y]
-                    all_shortest_paths = list(nx.all_shortest_paths(graph, x, y))
-                    if shortest_path_length_with_node == shortest_path_length_without_node:
-                        for path in all_shortest_paths:
-                            if node in path:
-                                shortest_paths += 1
-                                shortest_paths_with_node += 1
-                            else:
-                                shortest_paths += 1
-                    else:
-                        shortest_paths += len(list(all_shortest_paths))
-                    betweenness += (shortest_paths_with_node / shortest_paths)
-    return (1 / ((size - 1) * (size - 2))) * betweenness
-
-
 def G_features(G, time):
     G_t = create_unweighted_G_t(G.train, 0)
     biggest_scc = nx.DiGraph(max(nx.strongly_connected_component_subgraphs(G_t), key=len))
-    closeness_dict = {}
-    betweenness_dict = {}
     size = biggest_scc.number_of_nodes()
-    shortest_paths = {}
     reversed_scc = biggest_scc.reverse()
+
+    shortest_paths = {}
+    closeness_dict = {}
+    betweenness_dict = dict.fromkeys(biggest_scc, 0.0)
+
     for node in reversed_scc.nodes():
         shortest_paths[node] = nx.single_source_shortest_path_length(biggest_scc, node)
         closeness_dict[node] = (size - 1) / sum(nx.single_source_shortest_path_length(reversed_scc, node).values())
 
     for node in biggest_scc.nodes():
-        betweenness_dict[node] = update_node_betweenness(node, biggest_scc, shortest_paths, size)
+        S, P, sigma = find_shortest_paths(biggest_scc, node)
+        betweenness_dict = compute_betweenness(betweenness_dict, S, P, sigma, node)
+
+    scale = 1.0 / ((size - 1) * (size - 2))
+    for node in betweenness_dict:
+        betweenness_dict[node] *= scale
 
     return {'a': closeness_dict, 'b': betweenness_dict}
+
+
+def compute_betweenness(betweenness_dict, S, P, sigma, source):
+    delta = dict.fromkeys(S, 0)
+    while S:
+        node = S.pop()
+        coefficients = (1.0 + delta[node]) / sigma[node]
+        for second_node in P[node]:
+            delta[second_node] += sigma[second_node] * coefficients
+        if node != source and node in betweenness_dict:
+            betweenness_dict[node] += delta[node]
+    return betweenness_dict
 
 
 def calculate_probabilities(graph, mode='undirected unweighted'):
@@ -105,6 +100,8 @@ def calculate_probabilities(graph, mode='undirected unweighted'):
     if mode == 'directed':
         shortest_path_lengths = dict(nx.all_pairs_shortest_path_length(graph))
     for node in graph.nodes():
+        if mode == 'directed':
+            shortest_paths = find_shortest_paths(graph, node)[2]
         for second_node in nx.non_neighbors(graph, node):
             if mode == 'undirected unweighted':
                 common_neighbors_size = len(list(nx.common_neighbors(graph, node, second_node)))
@@ -122,7 +119,7 @@ def calculate_probabilities(graph, mode='undirected unweighted'):
                 if second_node in shortest_path_lengths[node]:
                     shortest_path_distance = shortest_path_lengths[node][second_node]
                     if shortest_path_distance <= 4:
-                        all_paths_count = len(list(nx.all_shortest_paths(graph, node, second_node)))
+                        all_paths_count = shortest_paths[second_node]
                         probabilities_to_add_edge[node][second_node] = min(1, all_paths_count / (math.pow(5, shortest_path_distance)))
     return probabilities_to_add_edge
 
@@ -143,17 +140,21 @@ def run_k_iterations(graph, N, mode='undirected unweighted'):
 
 
 def compute_distribution(dataset):
-    data = pd.read_csv(dataset)
-    df = data[['source', 'target']].groupby('source')['target'].nunique().reset_index(name='count')
-    df_hist = df.groupby('count')['source'].count().reset_index(name='hist_value')
-    df_hist.plot(x='count', y='hist_value', kind='scatter', logx=True, logy=True)
+    data = pd.read_csv("data_students.txt")
+    dataframe = data[['source', 'target']].groupby('source').nunique()
+    dataframe['target'].plot.hist(ylim=(0, 50))
+
+    dataframe = data[['source', 'target']].groupby('source')['target'].nunique().reset_index(name='count')
+    dataframe_hist = dataframe.groupby('count')['source'].count().reset_index(name='hist_value')
+    dataframe_hist.plot(x='count', y='hist_value', kind='scatter', logx=True, logy=True)
     plt.show()
 
-    x = np.log(np.array(df_hist['count']))
-    y = np.log(np.array(df_hist['hist_value']))
+    x = np.log(np.array(dataframe_hist['count']))
+    y = np.log(np.array(dataframe_hist['hist_value']))
     a = np.polyfit(x, y, 1)
     y_1 = [(a[0]*i + a[1]) for i in x]
     fig = plt.figure()
+
     ax = fig.gca()
     ax.scatter(np.exp(x), np.exp(y), c='blue')
     ax.plot(np.exp(x), np.exp(y_1), c='red')
@@ -162,3 +163,38 @@ def compute_distribution(dataset):
     plt.show()
 
     # bow tie
+    source_data = data['source'].tolist()
+    target_data = data['target'].tolist()
+    intersection = list(set(source_data) & set(target_data))
+    left_data = set(source_data) - set(target_data)
+    right_data = set(target_data) - set(source_data)
+
+    print(len(left_data))
+    print(len(intersection))
+    print(len(right_data))
+    print(len(left_data.union(intersection, right_data)))
+
+
+def find_shortest_paths(graph, source):
+    S = []
+    P = {}
+    for node in graph:
+        P[node] = []
+    sigma = dict.fromkeys(graph, 0.0) # sigma[node]=0 for every node in G
+    distances = {}
+    sigma[source] = 1.0
+    distances[source] = 0
+    Q = [source]
+    while Q: # we use BFS to find the shortest paths
+        node = Q.pop(0)
+        S.append(node)
+        Dv = distances[node]
+        sigma_node = sigma[node]
+        for second_node in graph[node]:
+            if second_node not in distances:
+                Q.append(second_node)
+                distances[second_node] = Dv + 1
+            if distances[second_node] == Dv + 1:  # if we found the shortest path, we count it
+                sigma[second_node] += sigma_node
+                P[second_node].append(node)  # we save the predecessors
+    return S, P, sigma
