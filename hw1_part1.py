@@ -57,29 +57,29 @@ def calc_error(predictions, test, mode='undirected unweighted'):
 	precision = len(intersections) / len(predictions)
 	return (precision, recall)
 
-def BFS_With_Number_Of_Shortest_Paths(G, source):
-    S = []
-    P = {}
+def BFS_With_Shortest_Paths(G, source):
+    nodes_queue = []
+    predecessors = {}
     for v in G:
-        P[v] = []
-    sigma = dict.fromkeys(G, 0.0)    # sigma[v]=0 for v in G
+        predecessors[v] = []
+    number_of_shortest_paths = dict.fromkeys(G, 0.0)    # sigma[v]=0 for v in G
     D = {}
-    sigma[source] = 1.0
+    number_of_shortest_paths[source] = 1.0
     D[source] = 0
     Q = [source]
     while Q:   # use BFS to find shortest paths
         v = Q.pop(0)
-        S.append(v)
+        nodes_queue.append(v)
         Dv = D[v]
-        sigmav = sigma[v]
+        sigmav = number_of_shortest_paths[v]
         for w in G[v]:
             if w not in D:
                 Q.append(w)
                 D[w] = Dv + 1
             if D[w] == Dv + 1:   # this is a shortest path, count paths
-                sigma[w] += sigmav
-                P[w].append(v)  # predecessors
-    return S, P, sigma
+                number_of_shortest_paths[w] += sigmav
+                predecessors[w].append(v)  # predecessors
+    return nodes_queue, predecessors, number_of_shortest_paths
 
 def update_betweenness(betweenness, bfs_nodes_queue, predecessors, number_of_shortest_paths, source):
     delta = dict.fromkeys(bfs_nodes_queue, 0)
@@ -105,7 +105,7 @@ def G_features(G, time):
 		a_dict[node] = (size - 1) / sum(nx.single_source_shortest_path_length(reversed_scc,node).values())
 
 	for node in biggest_scc.nodes() :
-		nodes_queue, predecessors, number_of_shortest_paths = BFS_With_Number_Of_Shortest_Paths(biggest_scc, node)
+		nodes_queue, predecessors, number_of_shortest_paths = BFS_With_Shortest_Paths(biggest_scc, node)
 		b_dict = update_betweenness(b_dict, nodes_queue, predecessors, number_of_shortest_paths, node)
 	
 	for node in biggest_scc.nodes() :
@@ -122,7 +122,7 @@ def calculate_probabilities(graph, mode='undirected unweighted') :
 	if mode == 'directed':
 		shortest_path_lengths = dict(nx.all_pairs_shortest_path_length(graph))
 		for node in graph.nodes() :
-			number_of_shortest_paths[node] = BFS_With_Number_Of_Shortest_Paths(graph, node)[2]
+			number_of_shortest_paths[node] = BFS_With_Shortest_Paths(graph, node)[2]
 	for node in graph.nodes() :
 		for second_node in nx.non_neighbors(graph, node):
 			if mode == 'undirected unweighted' :
@@ -163,9 +163,9 @@ def run_k_iterations(graph, N, mode='undirected unweighted'):
 def last_question(dataset):
 	#predicting new edges
 	points = dataset.train[['source', 'target', 'rating']].values
-	points[:,2] *= 1000
+	points[:,2] *= 10000
 	test = dataset.test[['source', 'target', 'rating']].values
-	centroids, centroids_to_rating, best_mse = k_means(points, test, 8, 100)
+	centroids, centroids_to_rating, best_mse = k_means(points, test, 10, 100)
 	graph = create_unweighted_G_t(dataset.train, 0)
 	added_edges = []
 	for i in range(0, 3) :
@@ -188,7 +188,7 @@ def probabilities_for_new_edges(graph) :
 	shortest_path_lengths = dict(nx.all_pairs_shortest_path_length(graph))
 	number_of_shortest_paths = defaultdict(dict)
 	for node in graph.nodes() :
-		number_of_shortest_paths[node] = BFS_With_Number_Of_Shortest_Paths(graph, node)[2]
+		number_of_shortest_paths[node] = BFS_With_Shortest_Paths(graph, node)[2]
 	probabilities_to_add_edge = defaultdict(dict)
 	for node in graph.nodes() :
 		for second_node in nx.non_neighbors(graph, node):
@@ -196,7 +196,7 @@ def probabilities_for_new_edges(graph) :
 				L = shortest_path_lengths[node][second_node]
 				if L <= 4:
 					M = number_of_shortest_paths[node][second_node]
-					probabilities_to_add_edge[node][second_node] = min(1, (M / (math.pow(10, L))) * get_average_rating_neighbors(graph, node))
+					probabilities_to_add_edge[node][second_node] = min(1, (M / (math.pow(10, 1.05 * L))) * get_average_rating_neighbors(graph, node))
 	return probabilities_to_add_edge
 
 def k_means(points, test, k, iterations) :
@@ -222,7 +222,7 @@ def k_means(points, test, k, iterations) :
 			for point in points2:
 				closest = predict_closest_centroid((point[0],point[1]), centroids)
 				mse += pow(centroids_to_rating[closest] - point[2], 2)
-			print(centroids_to_rating)
+			print(best_centroids_to_rating)
 			if mse < best_mse or best_mse == 0:
 				best_mse = mse
 				best_centroids = centroids
@@ -244,7 +244,7 @@ def get_average_rating_in_centroid(centroids, centroid, points):
 	for point in points :
 		if np.array_equal(centroid, centroids[closest_centroid(point, centroids)[0]]):
 			points_size += 1
-			average_rating += point[2] / 1000
+			average_rating += point[2] / 10000
 	rating = int(average_rating / points_size)
 	if rating == 0 :
 		return -1
