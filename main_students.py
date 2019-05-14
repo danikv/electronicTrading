@@ -18,7 +18,7 @@ def main():
     data_reading.stop()
 
     histogram_timer = Timer.Timer('Part A1')
-    st.calculate_distribution('data_students.txt')
+    st.compute_histogram('data_students.txt')
     histogram_timer.stop()
 
     features_timer = Timer.Timer('Part A2')

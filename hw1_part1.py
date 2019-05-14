@@ -28,128 +28,21 @@ class ModelData:
         self.test_x = self.test[['source', 'target']]
         self.test_y = self.test[['rating']]
 
-# for Part B
-def create_unweighted_H_t(train, time):
-    return nx.Graph(train)
-
-# for Part B
-def create_weighted_H_t(train, time):
-    H_t = nx.Graph()
-    directed_graph = nx.DiGraph(train)
-    for edge in directed_graph.edges():
-        if H_t.has_edge(edge[0], edge[1]):
-            H_t.add_edge(edge[0], edge[1], weight='strong')
-        else:
-            H_t.add_edge(edge[0], edge[1], weight='weak')
-    return H_t
-
-# for Part A2
-def create_unweighted_G_t(train, time):
-    return nx.DiGraph(train)
-
-# for part B
-def calc_error(predictions, test, mode='undirected unweighted'):
-    precision, recall = 0, 0
-    data_list = tuple(map(tuple, test.values.tolist()))
-    intersections = set(predictions) & set(data_list)
-    recall = len(intersections) / len(test)
-    precision = len(intersections) / len(predictions)
-    return (precision, recall)
-
-# Part A2
-def G_features(G, time):
-    G_t = create_unweighted_G_t(G.train, 0)
-    biggest_scc = nx.DiGraph(max(nx.strongly_connected_component_subgraphs(G_t), key=len))
-    size = biggest_scc.number_of_nodes()
-    reversed_scc = biggest_scc.reverse()
-
-    shortest_paths = {}
-    closeness_dict = {}
-    betweenness_dict = dict.fromkeys(biggest_scc, 0.0)
-
-    for node in reversed_scc.nodes():
-        shortest_paths[node] = nx.single_source_shortest_path_length(biggest_scc, node)
-        closeness_dict[node] = (size - 1) / sum(nx.single_source_shortest_path_length(reversed_scc, node).values())
-
-    for node in biggest_scc.nodes():
-        S, P, shortest_paths = find_shortest_paths(biggest_scc, node)
-        betweenness_dict = calculate_betweenness(betweenness_dict, S, P, shortest_paths, node)
-
-    scale = 1.0 / ((size - 1) * (size - 2))
-    for node in betweenness_dict:
-        betweenness_dict[node] *= scale
-
-    return {'a': closeness_dict, 'b': betweenness_dict}
-
-# for Part A2
-def calculate_betweenness(betweenness_dict, S, P, sigma, source):
-    delta = dict.fromkeys(S, 0)
-    while S:
-        node = S.pop()
-        coefficients = (1.0 + delta[node]) / sigma[node]
-        for second_node in P[node]:
-            delta[second_node] += sigma[second_node] * coefficients
-        if node != source and node in betweenness_dict:
-            betweenness_dict[node] += delta[node]
-    return betweenness_dict
-
-# for Part B
-def calculate_probabilities(graph, mode='undirected unweighted'):
-    probabilities_to_add_edge = defaultdict(dict)
-    if mode == 'directed':
-        shortest_path_lengths = dict(nx.all_pairs_shortest_path_length(graph))
-    for node in graph.nodes():
-        if mode == 'directed':
-            S, P, shortest_paths = find_shortest_paths(graph, node)
-        for second_node in nx.non_neighbors(graph, node):
-            if mode == 'undirected unweighted':
-                common_neighbors_size = len(list(nx.common_neighbors(graph, node, second_node)))
-                probabilities_to_add_edge[node][second_node] = 1 - pow(float(0.97), common_neighbors_size)
-            elif mode == 'undirected weighted':
-                m = 0
-                n = 0
-                for neighbor in nx.common_neighbors(graph, node, second_node):
-                    if graph[node][neighbor]['weight'] == 'strong':
-                        m += 1
-                    else:
-                        n += 1
-                probabilities_to_add_edge[node][second_node] = 1 - (pow(float(0.96), m) * pow(float(0.98), n))
-            elif mode == 'directed':
-                if second_node in shortest_path_lengths[node]:
-                    shortest_path_distance = shortest_path_lengths[node][second_node]
-                    if shortest_path_distance <= 4:
-                        all_paths_count = shortest_paths[second_node]
-                        probabilities_to_add_edge[node][second_node] = min(1, all_paths_count / (math.pow(5, shortest_path_distance)))
-    return probabilities_to_add_edge
-
-# Part B
-def run_k_iterations(graph, N, mode='undirected unweighted'):
-    edges_to_add = []
-    for i in range(N):
-        probabilities_to_add_edge = calculate_probabilities(graph, mode)
-        for node, value in probabilities_to_add_edge.items():
-            for second_node, probability in value.items():
-                if probability > random.random():
-                    edges_to_add.append((node, second_node))
-                    if mode == 'undirected weighted':
-                        graph.add_edge(node, second_node, weight='weak')
-                    else:
-                        graph.add_edge(node, second_node)
-    return edges_to_add
-
 # Part A1
-def calculate_distribution(dataset):
-    data = pd.read_csv("data_students.txt")
-    dataframe = data[['source', 'target']].groupby('source').nunique()
-    dataframe['target'].plot.hist(ylim=(0, 50))
 
-    dataframe = data[['source', 'target']].groupby('source')['target'].nunique().reset_index(name='count')
-    dataframe_hist = dataframe.groupby('count')['source'].count().reset_index(name='hist_value')
-    dataframe_hist.plot(x='count', y='hist_value', kind='scatter', logx=True, logy=True)
+
+def compute_histogram(dataset):
+    data = pd.read_csv("data_students.txt")
+    df = data[['source', 'target']].groupby('source').nunique()
+    df['target'].plot.hist(ylim=(0, 50))
+
+    df = data[['source', 'target']].groupby('source')['target'].nunique().reset_index(name='count')
+    df_hist = df.groupby('count')['source'].count().reset_index(name='hist_value')
+    df_hist.plot(x='count', y='hist_value', kind='scatter', logx=True, logy=True)
     plt.show()
 
-    x = np.log(np.array(dataframe_hist['count']))
-    y = np.log(np.array(dataframe_hist['hist_value']))
+    x = np.log(np.array(df_hist['count']))
+    y = np.log(np.array(df_hist['hist_value']))
     a = np.polyfit(x, y, 1)
     y_1 = [(a[0]*i + a[1]) for i in x]
     fig = plt.figure()
@@ -161,40 +54,172 @@ def calculate_distribution(dataset):
     ax.set_xscale('log')
     plt.show()
 
-    # bow tie structure calculation
-    source_data = data['source'].tolist()
-    target_data = data['target'].tolist()
-    intersection = list(set(source_data) & set(target_data))
-    left_data = set(source_data) - set(target_data)
-    right_data = set(target_data) - set(source_data)
+    # bow tie part
+    data_source = data['source'].tolist()
+    data_target = data['target'].tolist()
+    data_intersection = list(set(data_source) & set(data_target))
+    difference_left = set(data_source) - set(data_target)
+    difference_right = set(data_target) - set(data_source)
 
-    print(len(left_data))
-    print(len(intersection))
-    print(len(right_data))
-    print(len(left_data.union(intersection, right_data)))
-    print('a =', np.exp(a[1]))
-    print('c =', -a[0])
+    print(len(difference_left))
+    print(len(data_intersection))
+    print(len(difference_right))
+    print(len(difference_left.union(data_intersection, difference_right)))
+    print('a value =', np.exp(a[1]))
+    print('c value =', -a[0])
 
-def find_shortest_paths(graph, source):
+# for Part A2
+
+
+def create_unweighted_G_t(train, time):
+    return nx.DiGraph(train)
+
+# Part A2
+
+
+def G_features(G, time):
+    G_t = create_unweighted_G_t(G.train, 0)
+    biggest_scc_graph = nx.DiGraph(max(nx.strongly_connected_component_subgraphs(G_t), key=len))
+    graph_size = biggest_scc_graph.number_of_nodes()
+    reversed_scc_graph = biggest_scc_graph.reverse()
+
+    paths = {}
+    closeness = {}
+    betweenness = dict.fromkeys(biggest_scc_graph, 0.0)
+
+    for v in reversed_scc_graph.nodes():
+        paths[v] = nx.single_source_shortest_path_length(biggest_scc_graph, v)
+        closeness[v] = (graph_size - 1) / sum(nx.single_source_shortest_path_length(reversed_scc_graph, v).values())
+
+    for v in biggest_scc_graph.nodes():
+        S, P, paths = all_shortest_paths_bfs(biggest_scc_graph, v)
+        betweenness = compute_betweenness(betweenness, S, P, paths, v)
+
+    n = 1.0 / ((graph_size - 1) * (graph_size - 2))
+
+    for v in betweenness:
+        betweenness[v] *= n
+
+    return {'a': closeness, 'b': betweenness}
+
+# for Part A2
+
+
+def compute_betweenness(betweenness, S, P, paths, source):
+    delta = dict.fromkeys(S, 0)
+    while S:
+        v = S.pop()
+        coeff = (1.0 + delta[v]) / paths[v]
+        for u in P[v]:
+            delta[u] += paths[u] * coeff
+        if v != source and v in betweenness:
+            betweenness[v] += delta[v]
+    return betweenness
+
+# Part B
+
+
+def run_k_iterations(graph, N, mode='undirected unweighted'):
+    edges = []
+    for i in range(N):
+        edge_probabilities = compute_probabilities(graph, mode)
+        for v, value in edge_probabilities.items():
+            for u, prob in value.items():
+                if should_probability(prob):
+                    edges.append((v, u))
+                    if mode == 'undirected weighted':
+                        graph.add_edge(v, u, weight='weak')
+                    else:
+                        graph.add_edge(v, u)
+    return edges
+
+# for Part B
+
+
+def create_unweighted_H_t(train, time):
+    return nx.Graph(train)
+
+# for Part B
+
+
+def create_weighted_H_t(train, time):
+    H_t = nx.Graph()
+    directed_graph = nx.DiGraph(train)
+    for edge in directed_graph.edges():
+        if H_t.has_edge(edge[0], edge[1]):
+            H_t.add_edge(edge[0], edge[1], weight='strong')
+        else:
+            H_t.add_edge(edge[0], edge[1], weight='weak')
+    return H_t
+
+
+# for part B
+def calc_error(predictions, test, mode='undirected unweighted'):
+    precision, recall = 0, 0
+    data_list = tuple(map(tuple, test.values.tolist()))
+    intersections = set(predictions) & set(data_list)
+    recall = len(intersections) / len(test)
+    precision = len(intersections) / len(predictions)
+    return (precision, recall)
+
+
+# for Part B
+def should_probability(prob):
+    return prob > random.random()
+
+# for Part B
+
+
+def compute_probabilities(graph, mode='undirected unweighted'):
+    edge_probabilities = defaultdict(dict)
+    if mode == 'directed':
+        shortest_lengths = dict(nx.all_pairs_shortest_path_length(graph))
+    for v in graph.nodes():
+        if mode == 'directed':
+            S, P, shortest_paths = all_shortest_paths_bfs(graph, v)
+        for u in nx.non_neighbors(graph, v):
+            if mode == 'undirected unweighted':
+                common_neighbors_size = len(list(nx.common_neighbors(graph, v, u)))
+                edge_probabilities[v][u] = 1 - pow(float(0.97), common_neighbors_size)
+            elif mode == 'undirected weighted':
+                m = 0
+                n = 0
+                for common_neighbor in nx.common_neighbors(graph, v, u):
+                    if graph[v][common_neighbor]['weight'] == 'strong':
+                        m += 1
+                    else:
+                        n += 1
+                edge_probabilities[v][u] = 1 - (pow(float(0.96), m) * pow(float(0.98), n))
+            elif mode == 'directed':
+                if u in shortest_lengths[v]:
+                    shortest_length = shortest_lengths[v][u]
+                    if shortest_length <= 4:
+                        num_of_paths = shortest_paths[u]
+                        edge_probabilities[v][u] = min(1, num_of_paths / (math.pow(5, shortest_length)))
+    return edge_probabilities
+
+
+def all_shortest_paths_bfs(graph, source):
     S = []
     P = {}
-    for node in graph:
-        P[node] = []
-    sigma = dict.fromkeys(graph, 0.0) # sigma[node]=0 for every node in G
-    distances = {}
+    for v in graph:
+        P[v] = []
+    # we put sigma[v]=0 for every v in the graph
+    sigma = dict.fromkeys(graph, 0.0)
+    path_lengths = {}
     sigma[source] = 1.0
-    distances[source] = 0
+    path_lengths[source] = 0
     Q = [source]
-    while Q: # we use BFS to find the shortest paths
-        node = Q.pop(0)
-        S.append(node)
-        node_distance = distances[node]
-        sigma_node = sigma[node]
-        for second_node in graph[node]:
-            if second_node not in distances:
-                Q.append(second_node)
-                distances[second_node] = node_distance + 1
-            if distances[second_node] == node_distance + 1:  # if we found the shortest path, we count it
-                sigma[second_node] += sigma_node
-                P[second_node].append(node)  # we save the predecessors
+    while Q:  # we use BFS to find the shortest paths
+        v = Q.pop(0)
+        S.append(v)
+        v_length = path_lengths[v]
+        sigma_v = sigma[v]
+        for u in graph[v]:
+            if u not in path_lengths:
+                Q.append(u)
+                path_lengths[u] = v_length + 1
+            if path_lengths[u] == v_length + 1:  # count shortest path if found
+                sigma[u] += sigma_v
+                P[u].append(v)  # track predecessors
     return S, P, sigma
