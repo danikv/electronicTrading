@@ -7,6 +7,8 @@ import pandas as pd
 import networkx as nx
 import random
 import numpy.polynomial.polynomial as poly
+from math import sqrt, floor
+import csv
 
 import Timer
 random.seed(0)
@@ -159,102 +161,115 @@ def run_k_iterations(graph, N, mode='undirected unweighted'):
 	return added_edges
 
 def last_question(dataset):
-	#first try linear regression
-	points = dataset.train[['source', 'rating']].values
-	centroids = initialize_centroids(points, 20)
+	#predicting new edges
+	points = dataset.train[['source', 'target', 'rating']].values
+	points[:,2] *= 1000
+	test = dataset.test[['source', 'target', 'rating']].values
+	centroids, centroids_to_rating, best_mse = k_means(points, test, 8, 100)
+	graph = create_unweighted_G_t(dataset.train, 0)
+	added_edges = []
+	for i in range(0, 3) :
+		probabilities = probabilities_for_new_edges(graph)
+		for node , value in probabilities.items() :
+			for second_node, probability in value.items():
+				if should_add_edge(probability) :
+					closest = predict_closest_centroid((node,second_node), centroids)
+					graph.add_edge(node, second_node, rating=centroids_to_rating[closest])
+					added_edges.append((node, second_node, centroids_to_rating[closest]))
 
-	closest = closest_centroid(points, centroids)
-	centroids = move_centroids(points, closest, centroids)
-	old_centroids = []
-	while np.array_equal(centroids, old_centroids):
-		closest = closest_centroid(points, centroids)
-		old_centroids = centroids
-		centroids = move_centroids(points, closest, centroids)
+	#write data
+	with open('hw1_part2.csv', mode='w' ,newline='') as csv_file:
+		fieldnames = ['source','target','rating','time']
+		data_writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+		for edge in added_edges :
+			data_writer.writerow({'source': edge[0], 'target': edge[1], 'rating': edge[2], 'time': 1453438800})
 
-	points = dataset.train[['target', 'rating']].values
-	centroids = initialize_centroids(points, 10)
+def probabilities_for_new_edges(graph) :
+	shortest_path_lengths = dict(nx.all_pairs_shortest_path_length(graph))
+	number_of_shortest_paths = defaultdict(dict)
+	for node in graph.nodes() :
+		number_of_shortest_paths[node] = BFS_With_Number_Of_Shortest_Paths(graph, node)[2]
+	probabilities_to_add_edge = defaultdict(dict)
+	for node in graph.nodes() :
+		for second_node in nx.non_neighbors(graph, node):
+			if second_node in shortest_path_lengths[node]:
+				L = shortest_path_lengths[node][second_node]
+				if L <= 4:
+					M = number_of_shortest_paths[node][second_node]
+					probabilities_to_add_edge[node][second_node] = min(1, (M / (math.pow(10, L))) * get_average_rating_neighbors(graph, node))
+	return probabilities_to_add_edge
 
-	closest = closest_centroid(points, centroids)
-	centroids2 = move_centroids(points, closest, centroids)
-	old_centroids = []
-	while np.array_equal(centroids, old_centroids):
-		closest = closest_centroid(points, centroids)
-		old_centroids = centroids
-		centroids = move_centroids(points, closest, centroids)
+def k_means(points, test, k, iterations) :
+	best_mse = 0
+	best_centroids = []
+	best_centroids_to_rating = {}
+	for i in range(0,iterations) :
+		try:
+			centroids = initialize_centroids(points, k)
 
-	points = dataset.test[['source', 'rating']].values
-	for point in points :
-		print(point)
-		print(closest_centroid(point, centroids))
-	plt.subplot(122)
-	plt.scatter(points[:, 0], points[:, 1])
-	plt.scatter(centroids[:, 0], centroids[:, 1], c='r', s=100)
-	plt.show()
+			closest = closest_centroid(points, centroids)
+			centroids = move_centroids(points, closest, centroids)
+			old_centroids = []
+			while np.array_equal(centroids, old_centroids):
+				closest = closest_centroid(points, centroids)
+				old_centroids = centroids
+				centroids = move_centroids(points, closest, centroids)
+			centroids_to_rating = {}
+			for i in range(k):
+				centroids_to_rating[i] = get_average_rating_in_centroid(centroids, centroids[i], points)
+			mse = 0
+			points2 = test
+			for point in points2:
+				closest = predict_closest_centroid((point[0],point[1]), centroids)
+				mse += pow(centroids_to_rating[closest] - point[2], 2)
+			print(centroids_to_rating)
+			if mse < best_mse or best_mse == 0:
+				best_mse = mse
+				best_centroids = centroids
+				best_centroids_to_rating = centroids_to_rating
+		except(Exception):
+			pass
+	return best_centroids, best_centroids_to_rating, best_mse
 
-	points = dataset.test[['target', 'rating']].values
-	for point in points :
-		print(point)
-		print(closest_centroid(point, centroids2))
-	plt.subplot(122)
-	plt.scatter(points[:, 0], points[:, 1])
-	plt.scatter(centroids2[:, 0], centroids2[:, 1], c='r', s=100)
-	plt.show()
+def get_average_rating_neighbors(graph, node) :
+	neighbors = list(graph.neighbors(node))
+	return max(1, sum(map(lambda x : graph[node][x]['rating'], neighbors)) / len(neighbors))
 
 def move_centroids(points, closest, centroids):
-    """returns the new centroids assigned from the points closest to them"""
     return np.array([points[closest==k].mean(axis=0) for k in range(centroids.shape[0])])
 
+def get_average_rating_in_centroid(centroids, centroid, points):
+	average_rating = 0
+	points_size = 0
+	for point in points :
+		if np.array_equal(centroid, centroids[closest_centroid(point, centroids)[0]]):
+			points_size += 1
+			average_rating += point[2] / 1000
+	rating = int(average_rating / points_size)
+	if rating == 0 :
+		return -1
+	return rating
+
 def closest_centroid(points, centroids):
-    """returns an array containing the index to the nearest centroid for each point"""
     distances = np.sqrt(((points - centroids[:, np.newaxis])**2).sum(axis=2))
     return np.argmin(distances, axis=0)
 
+def predict_closest_centroid(points, centroids):
+	distances = np.sqrt(((points - centroids[:, [0,1]])**2).sum(axis=1))
+	return np.argmin(distances, axis=0)
+
 def initialize_centroids(points, k):
-    """returns k centroids from the initial points"""
-    centroids = points.copy()
-    np.random.shuffle(centroids)
-    return centroids[:k]
-
-
-def linear_regression(dataset):
-	X = dataset.train_x.values
-	Y = dataset.train_y.values
-	m = Y.size
-	t = X
-	X = np.hstack((np.matrix(np.ones(m).reshape(m, 1)), t))
-	theta = np.matrix(np.ones(3).reshape(3, 1))
-	theta = GradientDissent(X, Y, theta, 0.0001, 1000)
-	print (cost(theta, X, Y))
-
-	X = dataset.test_x.values
-	Y = dataset.test_y.values
-	m = Y.size
-	t = X
-	X = np.hstack((np.matrix(np.ones(m).reshape(m, 1)), t))
-	print(cost(theta, X, Y))
-
-def GradientDissent(X, Y, theta, alpha, num_iters):
-	m = np.size(Y)
-	hx = np.matmul(X, theta)
-	c1 = cost(theta, X, Y)
-	for i in range(0, num_iters): # 3 X 15 * 15
-		temp = (alpha / m) * np.matmul(X.T, (hx - Y))
-		c2 = cost(theta - temp, X, Y)
-
-		if c1 > c2:
-			c1 = c2
-			theta = theta - temp
-
-	return theta
-
-def cost(theta, X, Y):
-    m = Y.size
-    hx = np.matmul(X, theta)
-    return np.sum(np.power(np.subtract(hx, Y), 2)) / (2 * m)
+	centroids = points.copy()
+	np.random.shuffle(centroids)
+	return centroids[:k]
 
 def partA_q1(dataset):
 	#plot
 	data = pd.read_csv(dataset)
+	graph = data[['source', 'target']].groupby('source').nunique()#['aId'].count().reset_index(name='count')
+	graph['target'].plot.hist(ylim=(0, 50))
+	plt.show()
+
 	df = data[['source', 'target']].groupby('source')['target'].nunique().reset_index(name='count')
 	df_hist = df.groupby('count')['source'].count().reset_index(name='hist_value')
 	df_hist.plot(x='count', y='hist_value', kind='scatter', logx=True, logy=True)
@@ -271,14 +286,3 @@ def partA_q1(dataset):
 	ax.set_yscale('log')
 	ax.set_xscale('log')
 	plt.show()
-
-	### bow tie -------------------------------
-	#answer = data['source'].tolist()
-	#ask = data['target'].tolist()
-	#middle = list(set(answer) & set(ask))
-	#left = set(answer) - set(ask)
-	#right = set(ask) - set(answer)
-	#print(len(left))
-	#print(len(middle))
-	#print(len(right))
-	#print(len(left.union(middle, right)))
