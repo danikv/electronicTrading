@@ -263,21 +263,22 @@ def initialize_centroids(points, k):
 	np.random.shuffle(centroids)
 	return centroids[:k]
 
-def partA_q1(dataset):
-	#plot
+def q1(dataset):
 	data = pd.read_csv(dataset)
-	graph = data[['source', 'target']].groupby('source').nunique()#['aId'].count().reset_index(name='count')
-	graph['target'].plot.hist(ylim=(0, 50))
+	graph = data[['source', 'target']].groupby('source').nunique()
+	graph['target'].plot.hist(ylim=(0, 300), bins=[0,1,2,10,20,50,100,200,300])
+	plt.xlabel("Answers")
+	plt.ylabel("Users")
 	plt.show()
 
 	df = data[['source', 'target']].groupby('source')['target'].nunique().reset_index(name='count')
 	df_hist = df.groupby('count')['source'].count().reset_index(name='hist_value')
-	df_hist.plot(x='count', y='hist_value', kind='scatter', logx=True, logy=True)
-	plt.show()
-
 	x = np.log(np.array(df_hist['count']))
 	y = np.log(np.array(df_hist['hist_value']))
 	a = np.polyfit(x, y, 1)
+	print('c value is - ', -a[0])
+	print('a value is - ', np.exp(a[1]))
+	print(a)
 	y_1 = [(a[0]*i + a[1]) for i in x]
 	fig = plt.figure()
 	ax = fig.gca()

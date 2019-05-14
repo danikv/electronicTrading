@@ -10,7 +10,7 @@ def main():
 	###########################################################################
 	time=1345521600
 
-	#st.partA_q1('data_students.txt')
+	st.q1('data_students.txt')
 
 	#data = st.ModelData('data_students.txt', time)
 	#st.last_question(data)
