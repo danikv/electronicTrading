@@ -12,10 +12,8 @@ def main():
 
 	st.q1('data_students.txt')
 
-	data = st.ModelData('data_students.txt', time)
-	st.last_question(data, time)
-	
-	#st.partA_q1('data_students.txt')
+	#data = st.ModelData('data_students.txt', time)
+	#st.last_question(data, time, 1453438800)
 	
 	"""Read the data files with the class ModelData into the a data object"""
 	total_time = Timer.Timer('Total running time')

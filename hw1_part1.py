@@ -158,9 +158,9 @@ def run_k_iterations(graph, N, mode='undirected unweighted'):
 		N -= 1
 	return added_edges
 
-def last_question(dataset, test_time):
+def last_question(dataset, test_time, prediction_time):
 	#predicting number of edges
-	added_edges_size = calculate_new_added_edges_size(dataset, test_time)
+	added_edges_size = calculate_new_added_edges_size(dataset, test_time, prediction_time)
 	print(added_edges_size)
 	#predicting new edges
 	points = dataset.train[['source', 'target', 'rating']].values
@@ -191,7 +191,7 @@ def add_edges(graph, added_edges_size, centroids, centroids_to_rating):
 					return added_edges
 	return added_edges
 
-def calculate_new_added_edges_size(dataset, test_time):
+def calculate_new_added_edges_size(dataset, test_time, prediction_time):
 	X , Y = calculate_features(dataset.train[['time', 'target']])
 	test_X , test_Y = calculate_features(dataset.test[['time', 'target']])
 	mse = 0
@@ -205,7 +205,7 @@ def calculate_new_added_edges_size(dataset, test_time):
 		if best_mse > mse or best_mse == 0:
 			best_mse = mse
 			best_prediction = z
-	return int(best_prediction(1453438800) - best_prediction(test_time))
+	return int(best_prediction(prediction_time) - best_prediction(test_time))
 
 def calculate_features(dataset):
 	X = dataset.groupby('time')['target'].count().to_dict()
