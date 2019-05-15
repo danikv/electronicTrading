@@ -158,29 +158,65 @@ def run_k_iterations(graph, N, mode='undirected unweighted'):
 		N -= 1
 	return added_edges
 
-def last_question(dataset):
+def last_question(dataset, test_time):
+	#predicting number of edges
+	added_edges_size = calculate_new_added_edges_size(dataset, test_time)
+	print(added_edges_size)
 	#predicting new edges
 	points = dataset.train[['source', 'target', 'rating']].values
 	points[:,2] *= 10000
 	test = dataset.test[['source', 'target', 'rating']].values
-	centroids, centroids_to_rating, best_mse = k_means(points, test, 10, 100)
+	centroids, centroids_to_rating, best_mse = k_means(points, test, 9, 100)
 	graph = create_unweighted_G_t(dataset.train, 0)
-	added_edges = []
-	for i in range(0, 3) :
-		probabilities = probabilities_for_new_edges(graph)
-		for node , value in probabilities.items() :
-			for second_node, probability in value.items():
-				if should_add_edge(probability) :
-					closest = predict_closest_centroid((node,second_node), centroids)
-					graph.add_edge(node, second_node, rating=centroids_to_rating[closest])
-					added_edges.append((node, second_node, centroids_to_rating[closest]))
-
+	added_edges = add_edges(graph, added_edges_size, centroids, centroids_to_rating)
 	#write data
 	with open('hw1_part2.csv', mode='w' ,newline='') as csv_file:
 		fieldnames = ['source','target','rating','time']
 		data_writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
 		for edge in added_edges :
 			data_writer.writerow({'source': edge[0], 'target': edge[1], 'rating': edge[2], 'time': 1453438800})
+
+def add_edges(graph, added_edges_size, centroids, centroids_to_rating):
+	added_edges = []
+	while(added_edges_size > 0):
+		probabilities = probabilities_for_new_edges(graph)
+		for node , value in probabilities.items() :
+			for second_node, probability in value.items():
+				if should_add_edge(probability):
+					closest = predict_closest_centroid((node,second_node), centroids)
+					graph.add_edge(node, second_node, rating=centroids_to_rating[closest])
+					added_edges.append((node, second_node, centroids_to_rating[closest]))
+					added_edges_size -= 1
+				if added_edges_size == 0 :
+					return added_edges
+	return added_edges
+
+def calculate_new_added_edges_size(dataset, test_time):
+	X , Y = calculate_features(dataset.train[['time', 'target']])
+	test_X , test_Y = calculate_features(dataset.test[['time', 'target']])
+	mse = 0
+	best_mse = 0
+	best_prediction = 0
+	for counter in range(1, 2):
+		z = np.poly1d(np.polyfit(X, Y, counter))
+		for j in range(len(test_Y)):
+			mse += np.power(np.subtract(z(test_X[j]), test_Y[j]), 2)
+		mse = mse / (2 * len(test_Y))
+		if best_mse > mse or best_mse == 0:
+			best_mse = mse
+			best_prediction = z
+	return int(best_prediction(1453438800) - best_prediction(test_time))
+
+def calculate_features(dataset):
+	X = dataset.groupby('time')['target'].count().to_dict()
+	time_values = []
+	count_values = []
+	last_value = 0
+	for key, value in X.items() :
+		time_values.append(key)
+		count_values.append(value + last_value)
+		last_value += value
+	return time_values, count_values
 
 def probabilities_for_new_edges(graph) :
 	shortest_path_lengths = dict(nx.all_pairs_shortest_path_length(graph))

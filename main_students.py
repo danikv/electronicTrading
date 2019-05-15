@@ -12,8 +12,8 @@ def main():
 
 	st.q1('data_students.txt')
 
-	#data = st.ModelData('data_students.txt', time)
-	#st.last_question(data)
+	data = st.ModelData('data_students.txt', time)
+	st.last_question(data, time)
 	
 	#st.partA_q1('data_students.txt')
 	
