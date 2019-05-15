@@ -60,36 +60,34 @@ def calc_error(predictions, test, mode='undirected unweighted'):
 def BFS_With_Shortest_Paths(G, source):
     nodes_queue = []
     predecessors = {}
-    for v in G:
-        predecessors[v] = []
-    number_of_shortest_paths = dict.fromkeys(G, 0.0)    # sigma[v]=0 for v in G
     D = {}
-    number_of_shortest_paths[source] = 1.0
     D[source] = 0
+    number_of_shortest_paths = dict.fromkeys(G, 0.0)
+    number_of_shortest_paths[source] = 1.0
+    for node in G:
+        predecessors[node] = []
     Q = [source]
-    while Q:   # use BFS to find shortest paths
-        v = Q.pop(0)
-        nodes_queue.append(v)
-        Dv = D[v]
-        sigmav = number_of_shortest_paths[v]
-        for w in G[v]:
-            if w not in D:
-                Q.append(w)
-                D[w] = Dv + 1
-            if D[w] == Dv + 1:   # this is a shortest path, count paths
-                number_of_shortest_paths[w] += sigmav
-                predecessors[w].append(v)  # predecessors
+    while Q:
+        node = Q.pop(0)
+        nodes_queue.append(node)
+        for neighbor in G[node]:
+            if neighbor not in D:
+                Q.append(neighbor)
+                D[neighbor] = D[node] + 1
+            if D[neighbor] == D[node] + 1:
+                number_of_shortest_paths[neighbor] +=  number_of_shortest_paths[node]
+                predecessors[neighbor].append(node)
     return nodes_queue, predecessors, number_of_shortest_paths
 
 def update_betweenness(betweenness, bfs_nodes_queue, predecessors, number_of_shortest_paths, source):
     delta = dict.fromkeys(bfs_nodes_queue, 0)
     while bfs_nodes_queue:
-        w = bfs_nodes_queue.pop()
-        coeff = (1 + delta[w]) / number_of_shortest_paths[w]
-        for v in predecessors[w]:
-            delta[v] += number_of_shortest_paths[v] * coeff
-        if w != source:
-            betweenness[w] += delta[w]
+        node = bfs_nodes_queue.pop()
+        coeff = (1 + delta[node]) / number_of_shortest_paths[node]
+        for predecessor in predecessors[node]:
+            delta[predecessor] += number_of_shortest_paths[predecessor] * coeff
+        if node != source:
+            betweenness[node] += delta[node]
     return betweenness
 
 
