@@ -94,7 +94,7 @@ def update_betweenness(betweenness, bfs_nodes_queue, predecessors, number_of_sho
 def G_features(G, time):
 	# section a is closeness centrality and b is betweenes centrality
 	g_t  = create_unweighted_G_t(G.train, 0)
-	biggest_scc = nx.DiGraph(max(nx.strongly_connected_component_subgraphs(g_t), key=len))
+	biggest_scc = g_t.subgraph(max(nx.strongly_connected_components(g_t), key=len))
 	a_dict = {}
 	b_dict = dict.fromkeys(biggest_scc, 0.0)
 	size = biggest_scc.number_of_nodes()
