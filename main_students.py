@@ -9,8 +9,11 @@ def main():
 	#######################            Part A           #######################
 	###########################################################################
 	time=1345521600
+
+	data = st.ModelData('data_students.txt', time)
+	st.partc(data, 1453438800)
 	
-	#st.partA_q1('data_students.txt')
+	st.q1_plot_data('data_students.txt')
 	
 	"""Read the data files with the class ModelData into the a data object"""
 	total_time = Timer.Timer('Total running time')
@@ -19,7 +22,7 @@ def main():
 	data_reading.stop()
 
 	data_reading = Timer.Timer('Calculate Features')
-	#features_dict=st.G_features(data, time)
+	features_dict=st.G_features(data, time)
 	data_reading.stop()
 
 	#print (features_dict)
@@ -30,7 +33,7 @@ def main():
 	k=6
 	time=1307221600
 
-	"""Read the data files with the class ModelData into the a data object"""
+	'''Read the data files with the class ModelData into the a data object'''
 	total_time = Timer.Timer('Total running time')
 	data_reading = Timer.Timer('Reading Data')
 	data = st.ModelData('data_students.txt', time)
@@ -62,7 +65,7 @@ def main():
 	eval_timer.stop()
 
 	model1_timer.stop()
-
+ 
 	####################### unweighted directed graph #######################
 	model2_timer = Timer.Timer('unweighted directed graph')
 
