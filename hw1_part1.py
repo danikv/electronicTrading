@@ -79,7 +79,7 @@ def create_unweighted_G_t(train, time):
 
 def G_features(G, time):
     G_t = create_unweighted_G_t(G.train, 0)
-    biggest_scc_graph = nx.DiGraph(max(nx.strongly_connected_component_subgraphs(G_t), key=len))
+    biggest_scc_graph = G_t.subgraph(max(nx.strongly_connected_components(G_t), key=len))
     graph_size = biggest_scc_graph.number_of_nodes()
     reversed_scc_graph = biggest_scc_graph.reverse()
 
