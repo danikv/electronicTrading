@@ -59,7 +59,7 @@ def calc_error(predictions, test, mode='undirected unweighted'):
 # Part A2
 def G_features(G, time):
     G_t = create_unweighted_G_t(G.train, 0)
-    biggest_scc = nx.DiGraph(max(nx.strongly_connected_component_subgraphs(G_t), key=len))
+    biggest_scc = G_t.subgraph(max(nx.strongly_connected_components(G_t), key=len))
     size = biggest_scc.number_of_nodes()
     reversed_scc = biggest_scc.reverse()
 
