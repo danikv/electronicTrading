@@ -10,8 +10,8 @@ def main():
 	###########################################################################
 	time=1345521600
 
-	data = st.ModelData('data_students.txt', time)
-	st.partc(data, 1453438800)
+	#data = st.ModelData('data_students.txt', time)
+	#st.partc(data, 1453438800)
 	
 	st.q1_plot_data('data_students.txt')
 	

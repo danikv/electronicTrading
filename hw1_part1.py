@@ -136,8 +136,8 @@ def calculate_probabilities(graph, mode='undirected unweighted') :
 def calculate_undirected_weigthed_probability(graph, node, non_neighbor):
 	number_of_strong_connections = 0
 	number_of_weak_connections = 0
-	for neighbor in nx.common_neighbors(graph, node, non_neighbor) :
-		if graph[node][neighbor]['weight'] == 'strong' :
+	for common_neighbor in nx.common_neighbors(graph, node, non_neighbor) :
+		if graph[node][common_neighbor]['weight'] == 'strong' :
 			number_of_strong_connections += 1
 		else:
 			number_of_weak_connections += 1
@@ -152,7 +152,7 @@ def calculate_directed_probability(graph, node, second_node, shortest_path_lengt
 
 def run_k_iterations(graph, N, mode='undirected unweighted'):
 	new_edges = []
-	while(N > 0):
+	for i in range(N):
 		probabilities = calculate_probabilities(graph, mode)
 		for node, node_probabilities in probabilities.items() :
 			for second_node, probability in node_probabilities.items():
@@ -162,7 +162,6 @@ def run_k_iterations(graph, N, mode='undirected unweighted'):
 						graph.add_edge(node, second_node, weight='weak')
 					else:
 						graph.add_edge(node, second_node)
-		N -= 1
 	return new_edges
 
 def partc(dataset, prediction_time):
@@ -217,7 +216,6 @@ def linear_regression(train_source_average_data, train_target_average_data, trai
 	test_M = len(test_rating)
 	test_X = np.hstack((np.matrix(np.ones(test_M).reshape(test_M, 1)), np.matrix(test_source_average_data).T,  np.matrix(test_target_average_data).T))
 	print(theta)
-	print(test_X, test_Y)
 	print(cost(np.matrix(theta).T, test_X, test_Y))
 	return np.matrix(theta).T
 
@@ -233,12 +231,12 @@ def add_edges(graph, added_edges_size, hypotesis, source_average_rating, target_
 	added_edges = []
 	while(added_edges_size > 0):
 		probabilities = calculate_last_question_probabilities(graph)
-		for node , value in probabilities.items() :
-			for second_node, probability in value.items():
+		for source , value in probabilities.items() :
+			for target, probability in value.items():
 				if should_add_edge(probability):
-					prediction = predict_rating(node, second_node, source_average_rating, target_average_rating, hypotesis)
-					graph.add_edge(node, second_node, rating=prediction)
-					added_edges.append((node, second_node, prediction))
+					prediction = predict_rating(source, target, source_average_rating, target_average_rating, hypotesis)
+					graph.add_edge(source, target, rating=prediction)
+					added_edges.append((source, target, prediction))
 					added_edges_size -= 1
 				if added_edges_size == 0 :
 					return added_edges
